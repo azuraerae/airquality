@@ -34,7 +34,7 @@
 #endif
 
 
-#include <Dictionary.h>
+#include <DictionaryDecarations.h>
 
 
 // ======================================================================
