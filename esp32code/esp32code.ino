@@ -1,6 +1,9 @@
+#include <AsyncTCP.h>
+#include <SPIFFS.h>
 #include <SparkFun_SCD30_Arduino_Library.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPAsyncWebServer.h>
 
 // Initialisation des variables
 SCD30 sensor;
@@ -10,7 +13,7 @@ int state = 2;
 int pins[] = {5, 17, 16};
 const char *ssid = "CO2_Sensor";
 const char *pw = "12345678";
-WebServer server(80);
+AsyncWebServer server(80);
 
 // Definire une nouvelle structure de données
 typedef struct {
@@ -31,7 +34,13 @@ void setup() {
 
   // Setup du Serial
   Serial.begin(115200);
-  println("Starting up ESP");
+  println("Starting up ESP and SPIFFS.");
+
+  // Setup de la mémoire SPIFFS
+  if(!SPIFFS.begin()){
+    println("An error was encountered while mounting SPIFFS...");
+    return; // This cancels the start of the ESP.
+  }
 
   // Setup du capteur
   Wire.begin();
@@ -53,7 +62,12 @@ void setup() {
   Serial.println(buffer);
 
   // Setup du server web
-  server.on("/", page);
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/main.html", "text/html", false);
+  });
+  server.on("/credits", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/credits.html", "text/html", false);
+  });
   server.begin();
 
   // Done
@@ -70,7 +84,6 @@ void __main(){
     stateHandler();
   }
   
-  server.handleClient();
   delay(2000);
 }
 
@@ -87,24 +100,6 @@ void stateHandler(){
   if(state > 2){state = 2;}
   turnOffAllLEDs();
   turnOnLED(state);
-}
-
-void page(){
-  String index = R"***(
-  <!DOCTYPE html>
-  <meta charset="utf-8"/>
-  <html>
-  <title>
-  "Incroyable"
-  </title>
-  <body>
-  <h1> 
-  "Test" 
-  </h1>
-  </body>
-  </html>
-  )***";
-  server.send(200, "text/html", index);
 }
 
 //Helper Functions
