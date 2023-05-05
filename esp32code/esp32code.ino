@@ -12,7 +12,7 @@ int state = 2;
 // Initialisation de constantes
 int pins[] = {5, 17, 16};
 const char *ssid = "CO2_Sensor";
-const char *pw = "12345678";
+const char *pw = "co2sensor1234";
 AsyncWebServer server(80);
 
 // Definire une nouvelle structure de données
@@ -27,7 +27,7 @@ Data sensorData;
 
 void setup() {
   // Setup des Pins écriture
-  for(int i = 0; i <= 2; i++){
+  for (int i = 0; i <= 2; i++) {
     pinMode(pins[i], OUTPUT);
     digitalWrite(pins[i], 0);
   }
@@ -37,16 +37,25 @@ void setup() {
   println("Starting up ESP and SPIFFS.");
 
   // Setup de la mémoire SPIFFS
-  if(!SPIFFS.begin()){
+  if (!SPIFFS.begin()) {
     println("An error was encountered while mounting SPIFFS...");
     return; // This cancels the start of the ESP.
+  } else {
+    println("Files present in filesys:");
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    while (file) {
+      print("File: ");
+      println(file.name());
+      file = root.openNextFile();
+    }
   }
 
   // Setup du capteur
   Wire.begin();
-  if(!sensor.begin()){
+  if (!sensor.begin()) {
     println("Air Sensor not detected. Press BP?");
-    while(1);  
+    while (1);
   }
 
   // Extinction des LEDs
@@ -62,12 +71,20 @@ void setup() {
   Serial.println(buffer);
 
   // Setup du server web
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/main.html", "text/html", false);
+  server.on("/credits", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/credits.html");
   });
-  server.on("/credits", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/credits.html", "text/html", false);
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/index.html");
   });
+
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+
+  server.onNotFound([](AsyncWebServerRequest *request) {
+    request->send(404);
+  });
+
   server.begin();
 
   // Done
@@ -78,45 +95,47 @@ void loop() {
   __main();
 }
 
-void __main(){
-  if(sensor.dataAvailable()){
+void __main() {
+  if (sensor.dataAvailable()) {
     updateData();
     stateHandler();
   }
-  
+
   delay(2000);
 }
 
-void updateData(){
+void updateData() {
   sensorData.CO2 = sensor.getCO2();
   sensorData.temp = sensor.getTemperature();
   sensorData.hum = sensor.getHumidity();
   println(String(sensorData.CO2));
 }
 
-void stateHandler(){
+void stateHandler() {
   int co2 = sensorData.CO2;
-  state = floor(1200/co2);
-  if(state > 2){state = 2;}
+  state = floor(1200 / co2);
+  if (state > 2) {
+    state = 2;
+  }
   turnOffAllLEDs();
   turnOnLED(state);
 }
 
 //Helper Functions
-void turnOffAllLEDs(){
-  for(int i = 0; i <= 2; i++){
+void turnOffAllLEDs() {
+  for (int i = 0; i <= 2; i++) {
     digitalWrite(pins[i], 0);
   }
 }
 
-void turnOnLED(int led){
+void turnOnLED(int led) {
   digitalWrite(pins[led], 1);
 }
 
-void print(String message){
+void print(String message) {
   Serial.print(message);
 }
 
-void println(String message){
+void println(String message) {
   Serial.println(message);
 }
